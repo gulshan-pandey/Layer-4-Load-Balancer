@@ -15,7 +15,7 @@ public class BackendServers {
    }
 
    public static String getHost(){
-       String host = servers.get(count% servers.size());    // Round Robin fashion
+       String host = servers.get(count% servers.size());    // Round-Robin fashion
        count++;
        return host;
    }

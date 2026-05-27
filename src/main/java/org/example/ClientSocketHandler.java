@@ -26,25 +26,46 @@ public class ClientSocketHandler implements Runnable{
             String BackendHost = BackendServers.getHost();
             System.out.println("Host is selected to handle this request  : " + BackendHost);
 
-            // now to make a socket request, basically a TCP connection to the Backend Server
+            // now to make a socket request, basically a TCP connection with the Backend Server
             Socket backendSocket  = new Socket(BackendHost, 8080);
 
-            InputStream LoadBalancerToBackendInputStream = backendSocket.getInputStream();
+            InputStream backendServerToLbIS = backendSocket.getInputStream();
 
-            OutputStream BackendToLoadBalancerOutputStream = backendSocket.getOutputStream();
+            OutputStream lBToBackendServerOS = backendSocket.getOutputStream();
 
             Thread clientDataHandler = new Thread(){
                 public void run(){
                     try{
                         int data;
                         while((data=cleintToLoadBalancerInputStream.read())!=1){
-
+                            lBToBackendServerOS.write(data);
                         }
                     } catch (IOException ex) {
                         ex.printStackTrace();
                     }
                 }
-            }
+            };
+
+            clientDataHandler.start();
+
+
+            // creating another thread that will read data byte by byte form the backend server to the LB and then parse it to the Client
+
+            Thread backendDataHandler = new Thread(){
+                public void run(){
+                    try{
+                        int data;
+                        while((data=backendServerToLbIS.read())!=1){
+                            loadBalancertoClientOutputStream.write(data);
+                        }
+                    } catch (IOException ex) {
+                        ex.printStackTrace();
+                    }
+                }
+            };
+
+            backendDataHandler.start();
+
 
         } catch (IOException e) {
             throw new RuntimeException(e);
