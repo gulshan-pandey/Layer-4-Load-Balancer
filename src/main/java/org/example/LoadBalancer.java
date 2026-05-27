@@ -12,14 +12,17 @@ public class LoadBalancer {
     private static final Logger LOGGER = Logger.getLogger(LoadBalancer.class.getName());
 
     public static void main(String[] args) throws IOException {
-        int port = Integer.parseInt(System.getProperty("lb.port", "8081"));
-        try (ServerSocket serverSocket = new ServerSocket(port)) {
-            LOGGER.info("Load Balancer started on port " + port + " with algorithm " + BackendServers.getAlgorithm());
+        try (ServerSocket serverSocket = new ServerSocket(8081)) {
+            BackendServers.setAlgorithm("RANDOM");
+            LOGGER.info(String.format("Load Balancer Started at port %d...!", 8081));
 
-            while (true) {
+            while(true) {
+
+
                 Socket socket = serverSocket.accept();
-                LOGGER.info("TCP connection established with client: " + socket);
+                LOGGER.info("TCP connection established with client  :" + socket.toString());
                 handleSocket(socket);
+
             }
         }
     }

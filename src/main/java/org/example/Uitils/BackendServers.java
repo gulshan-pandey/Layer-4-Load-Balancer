@@ -1,72 +1,47 @@
 package org.example.Uitils;
 
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.Random;
 import java.util.logging.Logger;
 
 public class BackendServers {
 
+    private static List<String> servers = new ArrayList<>();
     private static final Logger LOGGER = Logger.getLogger(BackendServers.class.getName());
-    private static final List<String> SERVERS = Arrays.asList("IP1", "IP2");
-    private static final Map<String, AtomicInteger> ACTIVE_CONNECTIONS = new ConcurrentHashMap<String, AtomicInteger>();
-    private static final AtomicInteger ROUND_ROBIN_COUNTER = new AtomicInteger(0);
-    private static final String ALGORITHM = System.getProperty("lb.algorithm", "round_robin").trim().toLowerCase();
+    private static final Random RANDOM = new Random();
 
-    static {
-        for (String server : SERVERS) {
-            ACTIVE_CONNECTIONS.put(server, new AtomicInteger(0));
-        }
-        LOGGER.info("Load balancing algorithm selected: " + ALGORITHM);
-    }
+    private static  int count =0;
+    private static String algorithm = "ROUND_ROBIN";
 
-    public static String getHost() {
-        if ("least_connections".equals(ALGORITHM)) {
-            return getLeastConnectionsHost();
-        }
-        return getRoundRobinHost();
-    }
+   static{
+       servers.add("IP1");
+       servers.add("IP2");
+   }
 
-    public static void registerConnection(String host) {
-        AtomicInteger count = ACTIVE_CONNECTIONS.get(host);
-        if (count != null) {
-            count.incrementAndGet();
-        }
-    }
+   public static String getHost(){
+       if ("RANDOM".equalsIgnoreCase(algorithm)) {
+           int index = RANDOM.nextInt(servers.size());
+           String host = servers.get(index);
+           LOGGER.info("Selected backend using RANDOM : " + host);
+           return host;
+       }
 
-    public static void releaseConnection(String host) {
-        AtomicInteger count = ACTIVE_CONNECTIONS.get(host);
-        if (count != null) {
-            int updatedCount = count.decrementAndGet();
-            if (updatedCount < 0) {
-                count.set(0);
-            }
-        }
-    }
+       String host = servers.get(count% servers.size());    // Round-Robin fashion
+       count++;
+       LOGGER.info("Selected backend using ROUND_ROBIN : " + host);
+       return host;
+   }
 
-    public static String getAlgorithm() {
-        return ALGORITHM;
-    }
+   public static void setAlgorithm(String selectedAlgorithm){
+       if ("RANDOM".equalsIgnoreCase(selectedAlgorithm) || "ROUND_ROBIN".equalsIgnoreCase(selectedAlgorithm)) {
+           algorithm = selectedAlgorithm.toUpperCase();
+           LOGGER.info("Load balancing algorithm set to : " + algorithm);
+           return;
+       }
+       LOGGER.warning("Invalid algorithm '" + selectedAlgorithm + "'. Falling back to ROUND_ROBIN");
+       algorithm = "ROUND_ROBIN";
+   }
 
-    private static String getRoundRobinHost() {
-        int index = Math.abs(ROUND_ROBIN_COUNTER.getAndIncrement() % SERVERS.size());
-        return SERVERS.get(index);
-    }
 
-    private static String getLeastConnectionsHost() {
-        String selectedHost = SERVERS.get(0);
-        int minConnections = ACTIVE_CONNECTIONS.get(selectedHost).get();
-
-        for (int i = 1; i < SERVERS.size(); i++) {
-            String currentHost = SERVERS.get(i);
-            int currentConnections = ACTIVE_CONNECTIONS.get(currentHost).get();
-            if (currentConnections < minConnections) {
-                minConnections = currentConnections;
-                selectedHost = currentHost;
-            }
-        }
-        return selectedHost;
-    }
 }
