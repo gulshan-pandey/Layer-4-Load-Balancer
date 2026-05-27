@@ -1,24 +1,26 @@
 package org.example;
 
-import com.sun.security.ntlm.Client;
+import org.example.Uitils.BackendServers;
 
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.logging.Logger;
 
 
 public class LoadBalancer {
+    private static final Logger LOGGER = Logger.getLogger(LoadBalancer.class.getName());
+
     public static void main(String[] args) throws IOException {
-        ServerSocket serverSocket = new ServerSocket(8081);
-        System.out.format("Load Balancer Started at port %d...!", 8081);
+        int port = Integer.parseInt(System.getProperty("lb.port", "8081"));
+        try (ServerSocket serverSocket = new ServerSocket(port)) {
+            LOGGER.info("Load Balancer started on port " + port + " with algorithm " + BackendServers.getAlgorithm());
 
-        while(true) {
-
-
-            Socket socket = serverSocket.accept();
-            System.out.println("TCP connection established with client  :"+ socket.toString());
-            handleSocket(socket);
-
+            while (true) {
+                Socket socket = serverSocket.accept();
+                LOGGER.info("TCP connection established with client: " + socket);
+                handleSocket(socket);
+            }
         }
     }
 

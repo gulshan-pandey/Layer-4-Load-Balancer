@@ -7,11 +7,14 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class ClientSocketHandler implements Runnable{
 
 
-    private Socket clientSocket;
+    private static final Logger LOGGER = Logger.getLogger(ClientSocketHandler.class.getName());
+    private final Socket clientSocket;
 
     public ClientSocketHandler(final Socket socket){
         this.clientSocket  = socket;
@@ -19,57 +22,64 @@ public class ClientSocketHandler implements Runnable{
 
     @Override
     public void run() {
-        try{
-            InputStream cleintToLoadBalancerInputStream = clientSocket.getInputStream();
-            OutputStream loadBalancertoClientOutputStream = clientSocket.getOutputStream();
+        String backendHost = BackendServers.getHost();
+        BackendServers.registerConnection(backendHost);
+        LOGGER.info("Routing connection to backend: " + backendHost);
 
-            String BackendHost = BackendServers.getHost();
-            System.out.println("Host is selected to handle this request  : " + BackendHost);
+        try {
+            InputStream clientToLoadBalancerInputStream = clientSocket.getInputStream();
+            OutputStream loadBalancerToClientOutputStream = clientSocket.getOutputStream();
 
-            // now to make a socket request, basically a TCP connection with the Backend Server
-            Socket backendSocket  = new Socket(BackendHost, 8080);
+            // open TCP connection to backend server
+            try (Socket backendSocket = new Socket(backendHost, 8080)) {
+                InputStream backendServerToLbIS = backendSocket.getInputStream();
+                OutputStream lBToBackendServerOS = backendSocket.getOutputStream();
 
-            InputStream backendServerToLbIS = backendSocket.getInputStream();
-
-            OutputStream lBToBackendServerOS = backendSocket.getOutputStream();
-            // input stream is to read the data and output stream is to write the data
-
-            Thread clientDataHandler = new Thread(){
-                public void run(){
-                    try{
-                        int data;
-                        while((data=cleintToLoadBalancerInputStream.read())!=1){
-                            lBToBackendServerOS.write(data);
-                        }
-                    } catch (IOException ex) {
-                        ex.printStackTrace();
+                Thread clientDataHandler = new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        forwardStreamData(clientToLoadBalancerInputStream, lBToBackendServerOS);
                     }
-                }
-            };
+                });
 
-            clientDataHandler.start();
-
-
-            // creating another thread that will read data byte by byte form the backend server to the LB and then parse it to the Client
-
-            Thread backendDataHandler = new Thread(){
-                public void run(){
-                    try{
-                        int data;
-                        while((data=backendServerToLbIS.read())!=1){
-                            loadBalancertoClientOutputStream.write(data);
-                        }
-                    } catch (IOException ex) {
-                        ex.printStackTrace();
+                Thread backendDataHandler = new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        forwardStreamData(backendServerToLbIS, loadBalancerToClientOutputStream);
                     }
-                }
-            };
+                });
 
-            backendDataHandler.start();
+                clientDataHandler.start();
+                backendDataHandler.start();
 
-
+                clientDataHandler.join();
+                backendDataHandler.join();
+            }
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            LOGGER.log(Level.SEVERE, "Socket handling failed for backend " + backendHost, e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            LOGGER.log(Level.WARNING, "Connection worker thread interrupted", e);
+        } finally {
+            BackendServers.releaseConnection(backendHost);
+            try {
+                clientSocket.close();
+            } catch (IOException e) {
+                LOGGER.log(Level.WARNING, "Failed to close client socket", e);
+            }
+            LOGGER.info("Connection finished for backend: " + backendHost);
+        }
+    }
+
+    private void forwardStreamData(InputStream source, OutputStream target) {
+        try {
+            int data;
+            while ((data = source.read()) != -1) {
+                target.write(data);
+            }
+            target.flush();
+        } catch (IOException e) {
+            LOGGER.log(Level.FINE, "Stream forwarding finished", e);
         }
     }
 }
