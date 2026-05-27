@@ -32,6 +32,7 @@ public class ClientSocketHandler implements Runnable{
             InputStream backendServerToLbIS = backendSocket.getInputStream();
 
             OutputStream lBToBackendServerOS = backendSocket.getOutputStream();
+            // input stream is to read the data and output stream is to write the data
 
             Thread clientDataHandler = new Thread(){
                 public void run(){

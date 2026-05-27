@@ -1,5 +1,7 @@
 package org.example;
 
+import com.sun.security.ntlm.Client;
+
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -15,8 +17,16 @@ public class LoadBalancer {
 
             Socket socket = serverSocket.accept();
             System.out.println("TCP connection established with client  :"+ socket.toString());
-
+            handleSocket(socket);
 
         }
+    }
+
+    private static void handleSocket(Socket socket) {
+
+        ClientSocketHandler clientSocketHandler = new ClientSocketHandler(socket);
+        Thread clientSocketHandlerThread = new Thread(clientSocketHandler);
+        clientSocketHandlerThread.start();
+
     }
 }
